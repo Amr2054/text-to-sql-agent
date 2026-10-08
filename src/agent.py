@@ -11,9 +11,9 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import TypedDict
 
-from tools import DB_PATH, QueryResult, get_schema, run_query_tool
+from .tools import DB_PATH, QueryResult, get_schema, run_query_tool
 
-PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = Path(__file__).resolve().parents[1]
 MAX_ATTEMPTS = 3
 load_dotenv(PROJECT_DIR / ".env")
 
@@ -61,14 +61,9 @@ class SQLState(TypedDict):
     answer: str | None
 
 
-# The model returns a validated decision instead of being forced to invent SQL.
-model = ChatOpenRouter(
-    model=os.getenv("OPENROUTER_MODEL") or "openrouter/free",
-    temperature=0,
-    timeout=60_000,  # This integration measures request timeouts in milliseconds.
-    max_retries=0,
-)
-query_model = model.with_structured_output(SQLDecision, method="function_calling")
+# Initialize on the first run so the UI can open before a key is configured.
+model = None
+query_model = None
 
 generate_query_system_prompt = """
 Answer questions using only the supplied SQLite database schema.
@@ -205,6 +200,19 @@ def report_failure(state: SQLState):
 
 
 def build_agent():
+    global model, query_model
+    if model is None:
+        if not os.getenv("OPENROUTER_API_KEY"):
+            raise ValueError("Add OPENROUTER_API_KEY to the project's .env file.")
+        model = ChatOpenRouter(
+            model=os.getenv("OPENROUTER_MODEL") or "openrouter/free",
+            temperature=0,
+            timeout=60_000,  # The OpenRouter integration uses milliseconds.
+            max_retries=0,
+        )
+    if query_model is None:
+        query_model = model.with_structured_output(SQLDecision, method="function_calling")
+
     builder = StateGraph(SQLState)
     for node in (load_schema, generate_query, run_query, generate_answer,
                  report_unsupported, report_failure):
@@ -238,8 +246,10 @@ def main():
 
     if args.draw_graph:
         graph = agent.get_graph()
-        (PROJECT_DIR / "graph.mmd").write_text(graph.draw_mermaid())
-        (PROJECT_DIR / "graph.png").write_bytes(graph.draw_mermaid_png())
+        assets = PROJECT_DIR / "Assets"
+        assets.mkdir(exist_ok=True)
+        (assets / "graph.mmd").write_text(graph.draw_mermaid())
+        (assets / "graph.png").write_bytes(graph.draw_mermaid_png())
 
     print(f"Question: {args.question}")
     inputs = {"question": args.question, "attempts": 0, "error": None}

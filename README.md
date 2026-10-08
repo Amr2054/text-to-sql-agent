@@ -1,6 +1,7 @@
 # Text-to-SQL Agent
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-web_interface-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-agent_workflow-1C3C3C)](https://docs.langchain.com/oss/python/langgraph/overview)
 [![LangChain](https://img.shields.io/badge/LangChain-models_and_tools-1C3C3C)](https://docs.langchain.com/oss/python/langchain/overview)
 [![OpenRouter](https://img.shields.io/badge/OpenRouter-model_access-6467F2)](https://openrouter.ai/)
@@ -21,6 +22,8 @@ because that information is absent from Chinook.
 
 ## Features
 
+- **Streamlit interface:** ask a question, read the answer, expand the SQL and
+  result table, and optionally inspect each correction attempt.
 - **Schema discovery:** reads table definitions directly from the database.
 - **Validated decisions:** Pydantic checks the model's `query` or `unsupported` decision.
   It validates the fields used by that decision and clears unused fields. An
@@ -42,12 +45,12 @@ execution. SQL execution and output validation do not guarantee semantic correct
 
 ## Agent graph
 
-<!-- Graph image placeholder: keep the latest agent diagram at graph.png. -->
+<!-- Graph image placeholder: keep the latest agent diagram at Assets/graph.png. -->
 ![Agent workflow with generation, execution, repair, unsupported, and failure paths](Assets/graph.png)
 
 ## Sample questions
 
-Each command starts a new, independent question. Session memory and human review
+Each submission starts a new, independent question. Session memory and human review
 are described in the [design plan](docs/human-review-and-session-memory.md);
 they are not implemented yet.
 
@@ -63,7 +66,7 @@ they are not implemented yet.
 For example:
 
 ```bash
-python Agent.py "Which five artists have the most albums? Show their names and album counts."
+python -m src.agent "Which five artists have the most albums? Show their names and album counts."
 ```
 
 A natural-language question cannot reliably force the model to generate invalid
@@ -83,7 +86,7 @@ responses to exercise the remaining paths:
 
 ### 1. Open the project
 
-Use Python **3.10 or newer**; this project was tested with Python 3.12. Download or
+Use Python **3.11 or newer**; this project was tested with Python 3.12. Download or
 clone this repository, then open a terminal in its root directory:
 
 ```bash
@@ -125,7 +128,7 @@ Chinook's upstream project is available at
 
 ### 5. Configure OpenRouter
 
-Create `.env` using:
+Create `.env` in the project root (beside `app.py`) if you do not already have one:
 
 ```bash
 cp .env.example .env
@@ -145,13 +148,38 @@ selects an available free model supporting the request's features. You can set
 `OPENROUTER_MODEL` to a specific model; query decisions require tool-calling support.
 Free model availability and response times can vary.
 
-### 6. Run a question
+### 6. Launch the interface
 
 ```bash
-python Agent.py "How many tracks are there?"
+python -m streamlit run app.py
 ```
 
-The terminal shows node updates followed by the conversational answer.
+Open the local address printed in the terminal (usually `http://localhost:8501`).
+Enter a question and click **Ask**. The page displays the conversational answer,
+an **Attempts** count, and expandable **Generated SQL** and **Execution result**.
+Enable **Show correction history** to inspect the SQL and outcome of each attempt:
+
+```text
+Attempts: 2
+Attempt 1 → SQL error
+Attempt 2 → Success
+```
+
+This history reflects actual graph events; a successful first query shows just one
+attempt. Invalid model responses and unsupported questions have their own labels.
+The final-answer model call does not add another SQL generation attempt.
+
+Opening details or toggling history preserves the last result without another
+model call. Clicking **Ask** starts a fresh run; previous questions are not sent
+to the model. Restart Streamlit after changing `.env` settings.
+
+You can also use the terminal:
+
+```bash
+python -m src.agent "How many tracks are there?"
+```
+
+This shows node updates followed by the conversational answer.
 
 ### 7. Enable LangSmith tracing (optional)
 
@@ -174,8 +202,24 @@ Terminal tracing is available independently of LangSmith. See the official
 ## Refresh the graph
 
 ```bash
-python Agent.py --draw-graph "How many tracks are there?"
+python -m src.agent --draw-graph "How many tracks are there?"
 ```
 
-This refreshes `graph.mmd` and `graph.png`, then runs the question. PNG rendering
+This refreshes `Assets/graph.mmd` and `Assets/graph.png`, then runs the question. PNG rendering
 uses the Mermaid rendering service and requires network access.
+
+## Project layout
+
+```text
+text-to-sql-agent/
+├── app.py              # Streamlit page and display of streamed attempts
+├── src/
+│   ├── __init__.py
+│   ├── agent.py        # State, prompts, nodes, graph, and terminal entry point
+│   └── tools.py        # SQLite schema discovery and read-only execution tool
+├── Assets/             # Agent graph image and Mermaid source
+├── database/chinook.db
+├── .env.example
+├── requirements.txt
+└── README.md
+```

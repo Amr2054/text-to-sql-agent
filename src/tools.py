@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 from langchain_core.tools import tool
 
-DB_PATH = Path(__file__).resolve().parent / "database" / "chinook.db"
+DB_PATH = Path(__file__).resolve().parents[1] / "database" / "chinook.db"
 
 class QueryResult(TypedDict):
     ok: bool
