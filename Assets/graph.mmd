@@ -1,0 +1,29 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	load_schema(load_schema)
+	generate_query(generate_query)
+	run_query(run_query)
+	generate_answer(generate_answer)
+	report_unsupported(report_unsupported)
+	report_failure(report_failure)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> load_schema;
+	generate_query -.-> report_failure;
+	generate_query -.-> report_unsupported;
+	generate_query -.-> run_query;
+	load_schema --> generate_query;
+	run_query -.-> generate_answer;
+	run_query -.-> generate_query;
+	run_query -.-> report_failure;
+	generate_answer --> __end__;
+	report_failure --> __end__;
+	report_unsupported --> __end__;
+	generate_query -.-> generate_query;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
